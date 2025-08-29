@@ -12,6 +12,7 @@ arch=""
 dryrun=
 flavors=""
 suffix="$(git describe --exact-match 2>/dev/null | tr v - || true)"
+container_cmd=podman
 
 usage() {
     cat <<EOF
@@ -63,7 +64,7 @@ target="tmp-w64-$$"
 cleanup() {
     $dryrun git checkout .
     $dryrun git stash pop
-    $dryrun docker rmi --no-prune $target || true
+    $dryrun $container_cmd rmi --no-prune $target || true
 }
 trap cleanup INT TERM
 
@@ -79,11 +80,11 @@ for build in $builds; do
             fi
         done
     )
-    $dryrun docker build -t $target .
+    $dryrun $container_cmd build -t $target .
     if [ -n "$dryrun" ]; then
-        $dryrun docker run --rm $target ">$build$suffix.7z.exe"
+        $dryrun $container_cmd run --rm $target ">$build$suffix.7z.exe"
     else
-        docker run --rm $target >$build$suffix.7z.exe
+        $container_cmd run --rm $target >$build$suffix.7z.exe
     fi
 done
 
