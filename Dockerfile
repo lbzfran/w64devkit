@@ -16,7 +16,6 @@ ARG MINGW_VERSION=13.0.0
 ARG MPC_VERSION=1.3.1
 ARG MPFR_VERSION=4.2.2
 ARG PDCURSES_VERSION=3.9
-ARG VIM_VERSION=9.0
 
 RUN apt-get update && apt-get install --yes --no-install-recommends \
   build-essential curl libgmp-dev libmpc-dev libmpfr-dev m4 p7zip-full
@@ -35,7 +34,6 @@ RUN curl --insecure --location --remote-name-all --remote-header-name \
     https://ftp.gnu.org/gnu/make/make-$MAKE_VERSION.tar.gz \
     https://ftp.gnu.org/gnu/libiconv/libiconv-$LIBICONV_VERSION.tar.gz \
     https://frippery.org/files/busybox/busybox-w32-$BUSYBOX_VERSION.tgz \
-    https://ftp.nluug.nl/pub/vim/unix/vim-$VIM_VERSION.tar.bz2 \
     https://github.com/universal-ctags/ctags/archive/refs/tags/v$CTAGS_VERSION.tar.gz \
     https://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-v$MINGW_VERSION.tar.bz2 \
     https://downloads.sourceforge.net/project/pdcurses/pdcurses/$PDCURSES_VERSION/PDCurses-$PDCURSES_VERSION.tar.gz
@@ -54,8 +52,7 @@ RUN sha256sum -c $PREFIX/src/SHA256SUMS \
  && tar xJf mpfr-$MPFR_VERSION.tar.xz \
  && tar xzf make-$MAKE_VERSION.tar.gz \
  && tar xjf mingw-w64-v$MINGW_VERSION.tar.bz2 \
- && tar xzf PDCurses-$PDCURSES_VERSION.tar.gz \
- && tar xjf vim-$VIM_VERSION.tar.bz2
+ && tar xzf PDCurses-$PDCURSES_VERSION.tar.gz
 COPY src/w64devkit.c src/w64devkit.ico src/libmemory.c src/libchkstk.S \
      src/alias.c src/debugbreak.c src/pkg-config.c src/vc++filt.c \
      src/peports.c src/profile $PREFIX/src/
@@ -437,28 +434,28 @@ RUN $ARCH-gcc -Os -fno-asynchronous-unwind-tables -Wl,--gc-sections -s \
     | xargs -I{} cp alias.exe $PREFIX/bin/{}.exe
 
 # TODO: Either somehow use $VIM_VERSION or normalize the workdir
-WORKDIR /vim90
-COPY src/rexxd.c src/vim-*.patch $PREFIX/src/
-RUN cat $PREFIX/src/vim-*.patch | patch -p1 \
- && ARCH= make -C src -j$(nproc) -f Make_ming.mak CC="$ARCH-gcc -std=gnu17" \
-        OPTIMIZE=SIZE STATIC_STDCPLUS=yes HAS_GCC_EH=no \
-        UNDER_CYGWIN=yes CROSS=yes CROSS_COMPILE=$ARCH- \
-        FEATURES=HUGE VIMDLL=yes NETBEANS=no WINVER=0x0501 \
- && $ARCH-strip src/vimrun.exe \
- && rm -rf runtime/tutor/tutor.* \
- && cp -r runtime $PREFIX/share/vim \
- && cp src/vimrun.exe src/gvim.exe src/vim.exe src/*.dll $PREFIX/share/vim/ \
- && printf '@set SHELL=\r\n@start "" "%%~dp0/../share/vim/gvim.exe" %%*\r\n' \
-        >$PREFIX/bin/gvim.bat \
- && printf '@set SHELL=\r\n@"%%~dp0/../share/vim/vim.exe" %%*\r\n' \
-        >$PREFIX/bin/vim.bat \
- && printf '@set SHELL=\r\n@"%%~dp0/../share/vim/vim.exe" %%*\r\n' \
-        >$PREFIX/bin/vi.bat \
- && printf '@vim -N -u NONE "+read %s" "+write" "%s"\r\n' \
-        '$VIMRUNTIME/tutor/tutor' '%TMP%/tutor%RANDOM%' \
-        >$PREFIX/bin/vimtutor.bat \
- && $ARCH-gcc -nostartfiles -O2 -funroll-loops -s -o $PREFIX/bin/xxd.exe \
-        $PREFIX/src/rexxd.c -lmemory
+# WORKDIR /vim90
+# COPY src/rexxd.c src/vim-*.patch $PREFIX/src/
+# RUN cat $PREFIX/src/vim-*.patch | patch -p1 \
+#  && ARCH= make -C src -j$(nproc) -f Make_ming.mak CC="$ARCH-gcc -std=gnu17" \
+#         OPTIMIZE=SIZE STATIC_STDCPLUS=yes HAS_GCC_EH=no \
+#         UNDER_CYGWIN=yes CROSS=yes CROSS_COMPILE=$ARCH- \
+#         FEATURES=HUGE VIMDLL=yes NETBEANS=no WINVER=0x0501 \
+#  && $ARCH-strip src/vimrun.exe \
+#  && rm -rf runtime/tutor/tutor.* \
+#  && cp -r runtime $PREFIX/share/vim \
+#  && cp src/vimrun.exe src/gvim.exe src/vim.exe src/*.dll $PREFIX/share/vim/ \
+#  && printf '@set SHELL=\r\n@start "" "%%~dp0/../share/vim/gvim.exe" %%*\r\n' \
+#         >$PREFIX/bin/gvim.bat \
+#  && printf '@set SHELL=\r\n@"%%~dp0/../share/vim/vim.exe" %%*\r\n' \
+#         >$PREFIX/bin/vim.bat \
+#  && printf '@set SHELL=\r\n@"%%~dp0/../share/vim/vim.exe" %%*\r\n' \
+#         >$PREFIX/bin/vi.bat \
+#  && printf '@vim -N -u NONE "+read %s" "+write" "%s"\r\n' \
+#         '$VIMRUNTIME/tutor/tutor' '%TMP%/tutor%RANDOM%' \
+#         >$PREFIX/bin/vimtutor.bat \
+#  && $ARCH-gcc -nostartfiles -O2 -funroll-loops -s -o $PREFIX/bin/xxd.exe \
+#         $PREFIX/src/rexxd.c -lmemory
 
 WORKDIR /ctags-$CTAGS_VERSION
 RUN sed -i /RT_MANIFEST/d win32/ctags.rc \
