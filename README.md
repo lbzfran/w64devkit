@@ -1,3 +1,9 @@
+# CHANGES
+
+This is a fork specifically to remove vim from the final build.
+
+That's it. I use neovim btw.
+
 # Portable C, C++, and Fortran Development Kit for x64 and x86 Windows
 
 [w64devkit][] is a Dockerfile that builds from source a small, portable
