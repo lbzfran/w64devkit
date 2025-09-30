@@ -6,7 +6,7 @@ ARG Z7_VERSION=2301
 ARG BINUTILS_VERSION=2.45
 ARG BUSYBOX_VERSION=FRP-5579-g5749feb35
 ARG CTAGS_VERSION=6.0.0
-ARG EXPAT_VERSION=2.7.0
+ARG EXPAT_VERSION=2.7.2
 ARG GCC_VERSION=15.2.0
 ARG GDB_VERSION=16.2
 ARG GMP_VERSION=6.3.0
@@ -24,15 +24,15 @@ RUN apt-get update && apt-get install --yes --no-install-recommends \
 
 RUN curl --insecure --location --remote-name-all --remote-header-name \
     https://downloads.sourceforge.net/project/sevenzip/7-Zip/23.01/7z$Z7_VERSION-src.tar.xz \
-    https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.xz \
-    https://ftp.gnu.org/gnu/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.xz \
-    https://ftp.gnu.org/gnu/gdb/gdb-$GDB_VERSION.tar.xz \
-    https://downloads.sourceforge.net/project/expat/expat/$EXPAT_VERSION/expat-$EXPAT_VERSION.tar.xz \
-    https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz \
-    https://ftp.gnu.org/gnu/mpc/mpc-$MPC_VERSION.tar.gz \
-    https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_VERSION.tar.xz \
-    https://ftp.gnu.org/gnu/make/make-$MAKE_VERSION.tar.gz \
-    https://ftp.gnu.org/gnu/libiconv/libiconv-$LIBICONV_VERSION.tar.gz \
+    https://ftpmirror.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.xz \
+    https://ftpmirror.gnu.org/gnu/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.xz \
+    https://ftpmirror.gnu.org/gnu/gdb/gdb-$GDB_VERSION.tar.xz \
+    https://github.com/libexpat/libexpat/releases/download/R_$(echo $EXPAT_VERSION | tr . _)/expat-$EXPAT_VERSION.tar.xz \
+    https://ftpmirror.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz \
+    https://ftpmirror.gnu.org/gnu/mpc/mpc-$MPC_VERSION.tar.gz \
+    https://ftpmirror.gnu.org/gnu/mpfr/mpfr-$MPFR_VERSION.tar.xz \
+    https://ftpmirror.gnu.org/gnu/make/make-$MAKE_VERSION.tar.gz \
+    https://ftpmirror.gnu.org/gnu/libiconv/libiconv-$LIBICONV_VERSION.tar.gz \
     https://frippery.org/files/busybox/busybox-w32-$BUSYBOX_VERSION.tgz \
     https://github.com/universal-ctags/ctags/archive/refs/tags/v$CTAGS_VERSION.tar.gz \
     https://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-v$MINGW_VERSION.tar.bz2 \
@@ -197,8 +197,7 @@ WORKDIR /mpfr
 RUN /mpfr-$MPFR_VERSION/configure \
         --prefix=/deps \
         --host=$ARCH \
-        --with-gmp-include=/deps/include \
-        --with-gmp-lib=/deps/lib \
+        --with-gmp=/deps \
         --enable-static \
         --disable-shared \
         CC=$ARCH-gcc \
@@ -211,10 +210,8 @@ WORKDIR /mpc
 RUN /mpc-$MPC_VERSION/configure \
         --prefix=/deps \
         --host=$ARCH \
-        --with-gmp-include=/deps/include \
-        --with-gmp-lib=/deps/lib \
-        --with-mpfr-include=/deps/include \
-        --with-mpfr-lib=/deps/lib \
+        --with-gmp=/deps \
+        --with-mpfr=/deps \
         --enable-static \
         --disable-shared \
         CC=$ARCH-gcc \
@@ -227,6 +224,7 @@ WORKDIR /mingw-headers
 RUN /mingw-w64-v$MINGW_VERSION/mingw-w64-headers/configure \
         --prefix=$PREFIX \
         --host=$ARCH \
+        --enable-idl \
         --with-default-msvcrt=msvcrt-os \
  && make -j$(nproc) \
  && make install
@@ -271,12 +269,9 @@ RUN echo 'BEGIN {print "pecoff"}' \
         --enable-static \
         --disable-shared \
         --with-pic \
-        --with-gmp-include=/deps/include \
-        --with-gmp-lib=/deps/lib \
-        --with-mpc-include=/deps/include \
-        --with-mpc-lib=/deps/lib \
-        --with-mpfr-include=/deps/include \
-        --with-mpfr-lib=/deps/lib \
+        --with-gmp=/deps \
+        --with-mpc=/deps \
+        --with-mpfr=/deps \
         --enable-languages=c,c++,fortran \
         --enable-libgomp \
         --enable-threads=posix \
@@ -314,8 +309,9 @@ RUN $ARCH-gcc -DEXE=gcc.exe -DCMD=cc \
         -Os -fno-asynchronous-unwind-tables -Wl,--gc-sections -s -nostdlib \
         -o $PREFIX/bin/c89.exe $PREFIX/src/alias.c -lkernel32 \
  && printf '%s\n' addr2line ar as c++filt cpp dlltool dllwrap elfedit g++ \
-      gcc gcc-ar gcc-nm gcc-ranlib gcov gcov-dump gcov-tool ld nm objcopy \
-      objdump ranlib readelf size strings strip windmc windres gfortran \
+      gcc gcc-ar gcc-nm gcc-ranlib gcov gcov-dump gcov-tool gendef gfortran \
+      ld nm objcopy objdump ranlib readelf size strings strip uuidgen widl \
+      windmc windres \
     | xargs -I{} -P$(nproc) \
           $ARCH-gcc -DEXE={}.exe -DCMD=$ARCH-{} \
             -Os -fno-asynchronous-unwind-tables \
@@ -333,6 +329,19 @@ RUN patch -d/mingw-w64-v$MINGW_VERSION -p1 <$PREFIX/src/gendef-silent.patch \
         LDFLAGS="-s" \
  && make -j$(nproc) \
  && cp gendef.exe $PREFIX/bin/
+
+WORKDIR /mingw-w64-v$MINGW_VERSION/mingw-w64-tools/widl
+COPY src/uuidgen.c $PREFIX/src/
+RUN ./configure \
+        --host=$ARCH \
+        --prefix=$PREFIX \
+        --with-widl-includedir=$PREFIX/include \
+        CFLAGS="-Os" \
+        LDFLAGS="-s" \
+ && make -j$(nproc) \
+ && cp widl.exe $PREFIX/bin/ \
+ && $ARCH-gcc -nostartfiles -Oz -s -o $PREFIX/bin/uuidgen.exe \
+        $PREFIX/src/uuidgen.c -lmemory
 
 WORKDIR /expat
 RUN /expat-$EXPAT_VERSION/configure \
@@ -476,7 +485,7 @@ RUN sed -i s/CommCtrl/commctrl/ $(grep -Rl CommCtrl CPP/) \
 
 WORKDIR /
 RUN rm -rf $PREFIX/share/man/ $PREFIX/share/info/ $PREFIX/share/gcc-*
-COPY README.md Dockerfile src/w64devkit.ini $PREFIX/
+COPY README.md Dockerfile w64devkit.ini $PREFIX/
 RUN printf "id ICON \"$PREFIX/src/w64devkit.ico\"" >w64devkit.rc \
  && $ARCH-windres -o w64devkit.o w64devkit.rc \
  && $ARCH-gcc -DVERSION=$VERSION -nostdlib -fno-asynchronous-unwind-tables \
